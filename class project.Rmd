@@ -1,0 +1,87 @@
+---
+title: "Prediction Course Project"
+author: "joe"
+date: "Wednesday, November 19, 2014"
+output: html_document
+---
+ 
+# Class Project
+
+## Getting the Data
+  First I need to set the working directory, download the files and load them into R.
+
+```{r}
+setwd("~/Coursera/prediction")
+fileUrl<-"http://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv"
+download.file(fileUrl,"training.csv")
+TheirTraining<- read.csv("training.csv")
+testingURL<-"http://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv"
+download.file(testingURL,"testing.csv")
+theirtesting<-read.csv("testing.csv")
+```
+
+Next I should load all my necessary packages.
+
+```{r}
+library(caret)
+library(randomForest)
+```
+
+## Preprocessing
+And lets get to work. Even though there is already a "testing" and "training" data set, the "testing" is kind of useless to me because it doesn't have the result variable "classe".  So I can't use it to test my own model before I turn it in.  So as a result I am going to split the testing into a 75%-25% chunk, and run my models on that 75%.
+
+```{r}
+inTrain <- createDataPartition(y=TheirTraining$classe,p=0.75, list=FALSE)
+training <- TheirTraining[inTrain,]
+testing <- TheirTraining[-inTrain,]
+```
+
+A whole bunch of these variables are mostly useless to me.  Either the majority of them are missing values, or they have nearly zero variance, or they are an index variable (i.e. row name) that would totally throw off your prediction (trust me, was really frustrated here for a while).  So I'm going to get rid of those.
+
+```{r}
+tmp<-training
+tmp <- tmp[, colSums(is.na(tmp))==0] 
+tmp<-tmp[,-c(1:7)]
+removeColumns <-nearZeroVar(tmp)
+tmp <- tmp[, -removeColumns]
+```
+
+## Testing
+
+ Now lets build a model and test!  I'm going to use randomForest because of the accuracy discussed in the lecture.  It seems like one of the best "out-of-the-box" models to use.  The only downside is: I tried to use it through the caret package with "train" so many times, but on my old hunk-of-junk computer it just really isn't feasible.  It was probably 50-to-1 slower than when I just call randomForest directly.  I had read there are some advantages to using train (cross validation, etc..) but I just really didn't have a choice.
+ 
+```{r, cache=TRUE}
+modFit <- randomForest(classe~ .,data=tmp, method="class")
+```
+
+And let's see how we did.  I want to test this model against the 25% testing sample I created.  I'm then going to graph those results against the actual classes and we'll see where I might have gone astray.
+
+```{r}
+pred <- predict(modFit,testing)
+testing$predRight <- pred==testing$classe
+table(pred,testing$classe)
+```
+
+Looks pretty dang accurate to me.  Let's make our predictions and turn them in!
+
+## Predictions!
+
+```{r}
+
+turnin<-predict(modFit,theirtesting)
+turnin
+
+
+
+pml_write_files = function(x){
+  n = length(x)
+  for(i in 1:n){
+    filename = paste0("problem_id_",i,".txt")
+    write.table(x[i],file=filename,quote=FALSE,row.names=FALSE,col.names=FALSE)
+  }
+}
+
+pml_write_files(turnin)
+```
+
+## Voila!
